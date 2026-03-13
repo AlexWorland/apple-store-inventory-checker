@@ -1,61 +1,107 @@
-# apple-store-inventory-checker
-Checks Apple Store inventory for new MacBook Pro models.
+# Apple Store Inventory Checker
 
-### Now available as a macOS app!
-This script's functionality is now available as a macOS app! Read more here: [InventoryWatch App by @worthbak](https://worthbak.github.io/inventory-checker-app/)
+Check Apple Store in-store pickup availability for iPhones, iPads, Macs, Apple Watches, and AirPods.
 
-### Installation 
-Run `npm install` to load the project's dependencies. Assumes recent `node` version (tested with `v17.0.1`, but should work with earlier versions).
-* `request` for simplifying network requests
-* `node-notifier` for sending local notifications when stock is detected
+> **Originally created by [@worthbak](https://github.com/worthbak/apple-store-inventory-checker).** Also available as a macOS app: [InventoryWatch by @worthbak](https://worthbak.github.io/inventory-checker-app/)
 
-### Running the script
-First, find the store number of your local Apple Store using [the included table](./apple-store-numbers.md) ([see here for Canadian stores](./apple-store-numbers-canada.md)). Then run the script, passing the number as an argument:
+## What's New (v3.0)
+
+- **All Apple products** — iPhones, iPads, Macs, Apple Watches, AirPods (~390 SKUs)
+- **State-wide search** — query all Apple Stores in a US state at once
+- **Multi-store search** — comma-separated store numbers
+- **Product filter** — `--product` flag to check specific categories
+- **Store map refresh** — `--refresh-stores` to rebuild state-to-store mapping
+- **Modernized** — native `fetch()`, no deprecated dependencies, Node.js 18+
+
+## Installation
 
 ```sh
-$ node index.js R123
+npm install
 ```
 
-This will query Apple's retail inventory for all 2021 MacBook Pro variants that are known to be stocked in-store. `R123` is a store in Nashvile, TN, so that store plus others in the surrouding area will be queried. The results are logged to `stdout`, and if any models are found, a notification will be sent. 
+Requires Node.js 18+.
 
-### For other countries
+## Usage
 
-Running the script without a 2nd argument will default to US stores. Adding a second argument specifies the country.
 ```sh
-$ node index.js R123 CA
+# Single store
+node index.js R072
+
+# Zip code / location
+node index.js 98105
+
+# All stores in a US state
+node index.js WA
+
+# Comma-separated store list
+node index.js R072,R003,R077
+
+# Filter by product category
+node index.js R072 --product iphone
+node index.js WA --product mac-mini
+node index.js 98105 --product watch,airpods
+
+# Rebuild state-to-store mapping from Apple's API
+node index.js --refresh-stores
 ```
 
-#### Currently Supported Countries
-| Countries         | Argument     |
-| ----------------- | ------------ |
-| United States     | US (default) |
-| Canada            | CA           |
-| Australia         | AU           |
-| Germany           | DE           |
-| United Kingdom    | UK           |
-| South Korea*      | KR           |
-| Hong Kong         | HK           |
+## Product Categories
 
-\* These countries do not appear to support in-store pickup, and as such may not work with this tool.
+### Group aliases (shorthand for multiple categories)
 
-### Polling in the background
-You might want this script to run every minute or so, to make sure you don't miss your desired model coming into stock. To run the script repeatedly, update the following line to match your local environment and add it to `crontab`. You will need to update the entry to point to the script directory on your local, your node location (use `which node`), and the desired log output file.
+| Group | Includes |
+|-------|----------|
+| `iphone` | 17 Pro Max, 17 Pro, Air, 17, 17e, 16, 16 Plus |
+| `ipad` | Pro 11", Pro 13", Air 11", Air 13", mini, iPad |
+| `mac` | MacBook Pro, MacBook Air, Mac mini, iMac, Mac Studio |
+| `watch` | Series 11, Ultra 3, SE |
+| `airpods` | AirPods 4, Pro 3, Max |
+
+### Individual categories
+
+`iphone-17-pro-max`, `iphone-17-pro`, `iphone-air`, `iphone-17`, `iphone-17e`, `iphone-16`, `iphone-16-plus`, `ipad-pro-11`, `ipad-pro-13`, `ipad-air-11`, `ipad-air-13`, `ipad-mini`, `ipad`, `macbook-pro`, `macbook-air`, `mac-mini`, `imac`, `mac-studio`, `watch-series-11`, `watch-ultra-3`, `watch-se`, `airpods`
+
+## Supported Countries
+
+| Country | Argument |
+|---------|----------|
+| United States | `US` (default) |
+| Canada | `CA` |
+| Australia | `AU` |
+| Germany | `DE` |
+| United Kingdom | `UK` |
+| South Korea | `KR` |
+| Hong Kong | `HK` |
+
 ```sh
-*/1 * * * * cd ~/path/to/script/folder/ && /usr/local/bin/node index.js R123 > ~/path/to/desired/log/script_output.log 2>&1
+# Check a UK store for MacBook Pros
+node index.js R092 UK --product macbook-pro
 ```
 
-### Customization 
-This script checks for most known MacBook Pro variants that are currently stocked by Apple Stores, and has some special logic for my personal favorite model (14" M1 Max 32 Core GPU, 64GB RAM, 2TB SSD in both Silver and Space Gray). You may want to tweak the code if you're not interested in the "Ultimate" models.
+## Polling in the Background
 
-### Apple Store Query URL Pattern
-For reference, here's how Apple's fulfillment API works.
+Run on a schedule with cron:
+
+```sh
+*/5 * * * * cd ~/apple-store-inventory-checker && node index.js WA --product mac-mini >> ~/inventory.log 2>&1
+```
+
+## Notes
+
+- **iPad Pro and iPad Air** are not available for in-store pickup via Apple's API — they appear to be online-order only
+- **CTO configurations** (custom storage/RAM) aren't stocked in stores and won't appear in results
+- Running without `--product` queries all ~390 SKUs, which may be slow — use the filter for faster checks
+- The `--refresh-stores` command queries Apple's API to rebuild the state-to-store mapping; the built-in map covers 235 stores across 43 states
+
+## API Reference
+
+This tool queries Apple's undocumented retail pickup API:
 
 ```
-GET https://www.apple.com/shop/fulfillment-messages
-  ?parts.0=MMQX3LL%2FA  // URL encoded part number MMQX3LL/A
-  &parts.1=MKH53LL%2FA  // URL encoded part number MKH53LL/A
-  &parts.2=MYD92LL%2FA  // URL encoded part number MYD92LL/A
-  ...
-  &searchNearby=true    // Instruct the API to search the designated store and the surrounding area
-  &store=R172           // Store number (R172 is in Boulder, CO)
+GET https://www.apple.com/shop/retail/pickup-message
+  ?pl=true
+  &parts.0=MDE14LL%2FA    # URL-encoded part number
+  &parts.1=MDE54LL%2FA
+  &store=R072              # Store number
+  &location=98105          # OR zip code (one or the other)
 ```
